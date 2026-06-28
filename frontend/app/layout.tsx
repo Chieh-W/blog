@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import './phase3.css';
 import { Header } from '@/components/Header';
 import { GsapLayer } from '@/components/GsapLayer';
+import { OscilloscopeRouteTransition } from '@/components/OscilloscopeRouteTransition';
 
 export const metadata: Metadata = {
   title: 'Cyber-Physical Nexus',
@@ -14,6 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="zh-CN">
       <body>
         <GsapLayer />
+        <OscilloscopeRouteTransition />
         <Header />
         <main>{children}</main>
       </body>
