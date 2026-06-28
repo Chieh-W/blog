@@ -1,0 +1,55 @@
+services:
+  blog-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cyber_blog_frontend
+    restart: unless-stopped
+    ports:
+      - "9053:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_SITE_URL: http://localhost:9053
+      STRAPI_API_URL: http://blog-backend:1337
+      NEXT_PUBLIC_STRAPI_API_URL: http://localhost:1337
+      REVALIDATE_SECRET: change-me-to-a-long-random-string
+    depends_on:
+      - blog-backend
+    networks:
+      - pcb-network
+
+  blog-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: cyber-physical-nexus-strapi:local
+    container_name: cyber_blog_backend
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 1337
+      NODE_ENV: production
+      DATABASE_CLIENT: sqlite
+      DATABASE_FILENAME: data/data.db
+      JWT_SECRET: change-me-jwt-secret
+      APP_KEYS: key1,key2,key3,key4
+      API_TOKEN_SALT: change-me-api-token-salt
+      ADMIN_JWT_SECRET: change-me-admin-jwt-secret
+      TRANSFER_TOKEN_SALT: change-me-transfer-token-salt
+      ENCRYPTION_KEY: change-me-32-plus-char-encryption-key
+    volumes:
+      - strapi_data:/opt/app/data
+      - strapi_uploads:/opt/app/public/uploads
+    ports:
+      - "1337:1337"
+    networks:
+      - pcb-network
+
+networks:
+  pcb-network:
+    driver: bridge
+
+volumes:
+  strapi_data:
+  strapi_uploads:
