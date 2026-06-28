@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { WebGLTopology } from '@/components/WebGLTopology';
 import { ArticleCard } from '@/components/ArticleCard';
+import { LogMatrixCurvature } from '@/components/LogMatrixCurvature';
 import { getPosts } from '@/lib/posts';
 
 export const revalidate = 60;
@@ -28,6 +29,7 @@ export default async function HomePage() {
       </section>
 
       <section className="section">
+        <LogMatrixCurvature />
         <div className="container">
           <div className="section-head" data-reveal>
             <h2>Latest Signals</h2>
