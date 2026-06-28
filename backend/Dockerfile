@@ -42,7 +42,6 @@ COPY package.json ./
 
 RUN set -eux; \
     test -f /usr/local/include/node/node.h; \
-    npm config set nodedir /usr/local; \
     npm config set registry "$NPM_REGISTRY"; \
     npm config set fetch-retries 5; \
     npm config set fetch-retry-mintimeout 20000; \
