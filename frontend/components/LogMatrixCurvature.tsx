@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import * as THREE from 'three';
 
 type CardBinding = {
-  element: HTMLElement;
+  element: HTMLElement | null;
   mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
 };
 
@@ -85,10 +85,10 @@ export function LogMatrixCurvature() {
         const mesh = new THREE.Mesh(geometry, createMaterial());
         mesh.frustumCulled = false;
         scene.add(mesh);
-        bindings.push({ element: cards[bindings.length], mesh });
+        bindings.push({ element: cards[bindings.length] ?? null, mesh });
       }
       bindings.forEach((binding, index) => {
-        binding.element = cards[index];
+        binding.element = cards[index] ?? null;
         binding.mesh.visible = Boolean(cards[index]);
       });
     };
@@ -109,7 +109,6 @@ export function LogMatrixCurvature() {
 
     let raf = 0;
     const render = (time: number) => {
-      const width = window.innerWidth;
       const height = window.innerHeight;
       const now = time / 1000;
 
