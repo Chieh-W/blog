@@ -1,4 +1,4 @@
-FROM m.daocloud.io/docker.io/library/node:20-alpine AS build
+FROM node:20-alpine AS build
 
 ARG ALPINE_MIRROR=mirrors.aliyun.com
 ARG NPM_REGISTRY=https://registry.npmmirror.com
@@ -53,7 +53,7 @@ ENV NODE_ENV=production
 
 RUN npm run build
 
-FROM m.daocloud.io/docker.io/library/node:20-alpine AS runner
+FROM node:20-alpine AS runner
 
 ARG ALPINE_MIRROR=mirrors.aliyun.com
 
