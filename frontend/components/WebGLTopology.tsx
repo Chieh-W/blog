@@ -120,7 +120,7 @@ export function WebGLTopology() {
     velocityWrite.texture.generateMipmaps = false;
 
     const simScene = new THREE.Scene();
-    const simCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const simCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1, 1);
     const simGeometry = new THREE.PlaneGeometry(2, 2);
     const initMaterial = new THREE.ShaderMaterial({ vertexShader: FULLSCREEN_VERTEX, fragmentShader: INIT_FRAGMENT });
     const velocityMaterial = new THREE.ShaderMaterial({
