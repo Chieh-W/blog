@@ -14,11 +14,15 @@ export default async function HomePage() {
         <WebGLTopology />
         <div className="container hero-content">
           <div className="kicker">Digital-Physical Resonance</div>
-          <h1><span className="gradient-text">Cyber-Physical</span><br />Nexus</h1>
+          <h1 className="hero-title" aria-label="Cyber-Physical Nexus">
+            <span>Cyber-Physical</span>
+            <br />
+            <span>Nexus</span>
+          </h1>
           <p>连接物理硬件与数字生态的极客构建者。这里记录服务器、网络、上位机、WebGL 与工程美学的交汇。</p>
           <div className="cta-row">
-            <Link className="btn" href="/posts">进入 Log Matrix</Link>
-            <Link className="btn secondary" href="/about">查看 Engineer Spec</Link>
+            <Link className="btn" href="/posts"><span>进入 Log Matrix</span></Link>
+            <Link className="btn secondary" href="/about"><span>查看 Engineer Spec</span></Link>
           </div>
         </div>
       </section>
@@ -27,7 +31,7 @@ export default async function HomePage() {
         <div className="container">
           <div className="section-head" data-reveal>
             <h2>Latest Signals</h2>
-            <p className="section-desc">文章卡片以电磁信号片段呈现，悬停时触发 RGB 通道错位与扫描线反馈。</p>
+            <p className="section-desc status-line">STATUS: RGB_SHIFT_READY · SIGNAL_LOCKED · CARD_MATRIX_ONLINE</p>
           </div>
           <div className="card-grid">
             {posts.slice(0, 3).map((post) => <ArticleCard post={post} key={post.slug} />)}
@@ -39,7 +43,7 @@ export default async function HomePage() {
         <div className="container signal-panel" data-reveal>
           <div className="section-head">
             <h2>System Baseline</h2>
-            <p className="section-desc">第一阶段先固定架构骨架：Next.js standalone、Strapi、Docker Compose、ISR 级内容刷新链路。</p>
+            <p className="section-desc status-line">STATUS: STANDALONE_RUNTIME · STRAPI_BUS · ISR_REVALIDATION_ARMED</p>
           </div>
           <div className="spec-grid">
             <div className="spec-item"><strong>Frontend</strong><span>Next.js standalone on Node.js runtime</span></div>
