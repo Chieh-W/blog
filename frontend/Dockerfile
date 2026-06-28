@@ -1,7 +1,14 @@
-﻿FROM m.daocloud.io/docker.io/library/node:20-alpine AS deps
+FROM m.daocloud.io/docker.io/library/node:20-alpine AS deps
 WORKDIR /app
 COPY package.json ./
-RUN npm config set registry https://registry.npmmirror.com -g && npm install --verbose
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+RUN set -eux; \
+    npm config set registry "$NPM_REGISTRY"; \
+    npm config set fetch-retries 5; \
+    npm config set fetch-retry-mintimeout 20000; \
+    npm config set fetch-retry-maxtimeout 120000; \
+    npm install --no-audit --fund=false --loglevel=warn || \
+    (npm config set registry https://registry.npmjs.org && npm install --no-audit --fund=false --loglevel=warn)
 
 FROM m.daocloud.io/docker.io/library/node:20-alpine AS builder
 WORKDIR /app
