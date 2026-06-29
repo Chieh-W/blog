@@ -25,7 +25,7 @@ export function TerminalTypewriter({ lines, className = '' }: { lines: string[];
     let lineIndex = 0;
     let scrambleTimer = 0;
     let holdTimer = 0;
-    let tween: gsap.core.Tween | null = null;
+    let tween: ReturnType<typeof gsap.to> | null = null;
     let disposed = false;
 
     const play = () => {
