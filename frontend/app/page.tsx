@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { WebGLTopology } from '@/components/WebGLTopology';
 import { ArticleCard } from '@/components/ArticleCard';
 import { LogMatrixCurvature } from '@/components/LogMatrixCurvature';
+import { TerminalTypewriter } from '@/components/TerminalTypewriter';
+import { LogMatrixStream } from '@/components/LogMatrixStream';
 import { getPosts } from '@/lib/posts';
 
 export const revalidate = 60;
@@ -14,7 +16,15 @@ export default async function HomePage() {
       <section className="hero">
         <WebGLTopology />
         <div className="container hero-content">
-          <div className="kicker">Precision Optics · Blueprint Depth</div>
+          <div className="kicker terminal-kicker">
+            <TerminalTypewriter
+              lines={[
+                'Precision Optics · Blueprint Depth',
+                'Kernel: Cyber-Physical Interface Resolved',
+                'Signal: EE/SE Nexus Online'
+              ]}
+            />
+          </div>
           <h1 className="hero-title" aria-label="Cyber-Physical Nexus">
             <span>Cyber-Physical</span>
             <br />
@@ -33,7 +43,15 @@ export default async function HomePage() {
         <div className="container">
           <div className="section-head" data-reveal>
             <h2>Latest Signals</h2>
-            <p className="section-desc status-line">STATUS: OPTICAL_LOCK_READY · BLUEPRINT_DIVE_ARMED · CAD_MATRIX_ONLINE</p>
+            <p className="section-desc status-line">
+              <TerminalTypewriter
+                lines={[
+                  'STATUS: OPTICAL_LOCK_READY · BLUEPRINT_DIVE_ARMED · CAD_MATRIX_ONLINE',
+                  'STATUS: THEME_UNIFORM_SYNC · WEBGL_OPTICS_READY',
+                  'STATUS: LAYERED_REVEAL_PIPELINE · STABLE'
+                ]}
+              />
+            </p>
           </div>
           <div className="card-grid">
             {posts.slice(0, 3).map((post) => <ArticleCard post={post} key={post.slug} />)}
@@ -45,7 +63,15 @@ export default async function HomePage() {
         <div className="container signal-panel" data-reveal>
           <div className="section-head">
             <h2>System Baseline</h2>
-            <p className="section-desc status-line">STATUS: STANDALONE_RUNTIME · STRAPI_BUS · ISR_REVALIDATION_ARMED</p>
+            <p className="section-desc status-line">
+              <TerminalTypewriter
+                lines={[
+                  'STATUS: STANDALONE_RUNTIME · STRAPI_BUS · ISR_REVALIDATION_ARMED',
+                  'STATUS: UBUNTU_DEPLOYMENT · ONLINE',
+                  'STATUS: SCROLL_CLOCK · RENDER_LOOP_SYNCED'
+                ]}
+              />
+            </p>
           </div>
           <div className="spec-grid">
             <div className="spec-item"><strong>Frontend</strong><span>Next.js standalone on Node.js runtime</span></div>
@@ -53,6 +79,12 @@ export default async function HomePage() {
             <div className="spec-item"><strong>Visual</strong><span>Three.js precision schematic particles</span></div>
             <div className="spec-item"><strong>CMS</strong><span>Strapi Headless content bus</span></div>
           </div>
+        </div>
+      </section>
+
+      <section className="section terminal-stream-section">
+        <div className="container">
+          <LogMatrixStream />
         </div>
       </section>
     </>
