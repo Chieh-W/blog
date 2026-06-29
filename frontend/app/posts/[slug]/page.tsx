@@ -24,20 +24,20 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
   const html = renderMarkdown(post.content);
 
   return (
-    <div className="page-shell">
+    <div className="page-shell post-detail-shell">
       <div className="container">
-        <div data-reveal style={{ marginBottom: 48 }}>
+        <div className="article-intro" data-reveal style={{ marginBottom: 48 }}>
           <div className="kicker">{post.category} · {post.date}</div>
           <h1 className="page-title">{post.title}</h1>
           <p className="page-lead">{post.excerpt}</p>
           <div className="tag-row">{post.tags.map((tag) => <span className="tag" key={tag}>#{tag}</span>)}</div>
         </div>
-        <div className="article-layout">
+        <div className="article-layout article-surface">
           <aside className="toc" data-reveal>
             <div>TRACE INDEX</div>
             <div style={{ marginTop: 16, color: 'var(--copper)' }}>scroll-linked TOC placeholder</div>
           </aside>
-          <article className="article-body" data-reveal dangerouslySetInnerHTML={{ __html: html }} />
+          <article className="article-body layered-body" data-reveal dangerouslySetInnerHTML={{ __html: html }} />
         </div>
       </div>
     </div>
