@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import './phase3.css';
+import './theme.css';
 import { Header } from '@/components/Header';
 import { GsapLayer } from '@/components/GsapLayer';
 import { OscilloscopeRouteTransition } from '@/components/OscilloscopeRouteTransition';
