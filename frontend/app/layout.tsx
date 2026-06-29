@@ -4,6 +4,7 @@ import './phase3.css';
 import { Header } from '@/components/Header';
 import { GsapLayer } from '@/components/GsapLayer';
 import { OscilloscopeRouteTransition } from '@/components/OscilloscopeRouteTransition';
+import { ThemeProvider } from '@/components/ThemeProvider';
 
 export const metadata: Metadata = {
   title: 'Cyber-Physical Nexus',
@@ -15,10 +16,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="zh-CN">
       <body>
-        <GsapLayer />
-        <OscilloscopeRouteTransition />
-        <Header />
-        <main>{children}</main>
+        <ThemeProvider>
+          <GsapLayer />
+          <OscilloscopeRouteTransition />
+          <Header />
+          <main>{children}</main>
+        </ThemeProvider>
       </body>
     </html>
   );
