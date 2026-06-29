@@ -42,20 +42,20 @@ const VELOCITY_FRAGMENT = `
 
   void main() {
     vec2 prev = decode(texture2D(uVelocity, vUv));
-    vec2 backtrace = vUv - prev * 0.020 * uDelta;
-    vec2 advected = decode(texture2D(uVelocity, backtrace)) * 0.982;
+    vec2 backtrace = vUv - prev * 0.014 * uDelta;
+    vec2 advected = decode(texture2D(uVelocity, backtrace)) * 0.966;
 
     vec2 delta = vUv - uMouse;
     delta.x *= uAspect;
-    float radius = exp(-dot(delta, delta) * 82.0);
-    vec2 stroke = (uMouse - uPrevMouse) * vec2(uAspect, 1.0) * 5.0;
-    vec2 vortex = vec2(-delta.y, delta.x) * radius * uImpulse * 0.74;
-    vec2 ripple = vec2(
-      sin((vUv.y + uTime * 0.11) * 18.0),
-      cos((vUv.x - uTime * 0.08) * 21.0)
-    ) * 0.006;
+    float radius = exp(-dot(delta, delta) * 96.0);
+    vec2 stroke = (uMouse - uPrevMouse) * vec2(uAspect, 1.0) * 3.2;
+    vec2 vortex = vec2(-delta.y, delta.x) * radius * uImpulse * 0.44;
+    vec2 drift = vec2(
+      sin((vUv.y + uTime * 0.07) * 12.0),
+      cos((vUv.x - uTime * 0.05) * 15.0)
+    ) * 0.0025;
 
-    vec2 velocity = advected + stroke * radius + vortex + ripple;
+    vec2 velocity = advected + stroke * radius + vortex + drift;
     gl_FragColor = encode(velocity);
   }
 `;
@@ -70,16 +70,21 @@ const FLUID_FRAGMENT = `
     return value.xy * 2.0 - 1.0;
   }
 
+  float gridLine(vec2 uv, vec2 density, float width) {
+    vec2 grid = abs(fract(uv * density) - 0.5);
+    return 1.0 - smoothstep(width, width + 0.012, min(grid.x, grid.y));
+  }
+
   void main() {
     vec2 velocity = decode(texture2D(uVelocity, vUv));
     float speed = length(velocity);
-    float curl = velocity.x - velocity.y;
-    float trace = smoothstep(0.018, 0.16, speed);
-    float scan = 0.5 + 0.5 * sin((vUv.y + curl * 0.08) * 92.0 + uTime * 2.1);
-    vec3 copper = vec3(0.98, 0.48, 0.04);
-    vec3 green = vec3(0.05, 0.88, 0.55);
-    vec3 color = mix(copper, green, clamp(speed * 3.2 + scan * 0.12, 0.0, 1.0));
-    float alpha = trace * (0.07 + scan * 0.045);
+    float trace = smoothstep(0.014, 0.12, speed);
+    float grid = gridLine(vUv + velocity * 0.06, vec2(26.0, 16.0), 0.018);
+    float scan = 0.5 + 0.5 * sin(vUv.y * 86.0 + uTime * 1.6);
+    vec3 cyan = vec3(0.024, 0.714, 0.832);
+    vec3 spark = vec3(0.961, 0.620, 0.043);
+    vec3 color = mix(cyan, spark, clamp(speed * 2.4, 0.0, 1.0));
+    float alpha = grid * 0.032 + trace * (0.045 + scan * 0.026);
     gl_FragColor = vec4(color, alpha);
   }
 `;
@@ -93,8 +98,14 @@ export function WebGLTopology() {
 
     const isSmall = window.matchMedia('(max-width: 768px)').matches;
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const renderer = new THREE.WebGLRenderer({ antialias: !isSmall, alpha: true, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isSmall ? 1.15 : 1.65));
+
+    if (isSmall || reducedMotion) {
+      host.classList.add('webgl-stage-mobile-static');
+      return () => host.classList.remove('webgl-stage-mobile-static');
+    }
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.65));
     renderer.setSize(host.clientWidth, host.clientHeight);
     host.appendChild(renderer.domElement);
 
@@ -105,8 +116,8 @@ export function WebGLTopology() {
     const group = new THREE.Group();
     scene.add(group);
 
-    const fluidSize = isSmall ? 64 : 96;
-    const targetOptions: THREE.WebGLRenderTargetOptions = {
+    const fluidSize = 96;
+    const targetOptions = {
       type: THREE.UnsignedByteType,
       format: THREE.RGBAFormat,
       minFilter: THREE.LinearFilter,
@@ -161,13 +172,13 @@ export function WebGLTopology() {
     fluidPlane.position.z = -2.2;
     scene.add(fluidPlane);
 
-    const count = isSmall ? 420 : 1100;
-    const columns = isSmall ? 24 : 38;
+    const count = 960;
+    const columns = 40;
     const positions = new Float32Array(count * 3);
     const base = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
-    const copper = new THREE.Color('#f59e0b');
-    const green = new THREE.Color('#10b981');
+    const cyan = new THREE.Color('#06b6d4');
+    const spark = new THREE.Color('#f59e0b');
 
     for (let i = 0; i < count; i++) {
       const phi = Math.acos(2 * Math.random() - 1);
@@ -179,8 +190,8 @@ export function WebGLTopology() {
       positions[i * 3] = base[i * 3] = x;
       positions[i * 3 + 1] = base[i * 3 + 1] = y;
       positions[i * 3 + 2] = base[i * 3 + 2] = z;
-      const mix = Math.random() * 0.28;
-      const c = copper.clone().lerp(green, mix);
+      const mix = Math.random() * 0.18;
+      const c = cyan.clone().lerp(spark, mix);
       colors[i * 3] = c.r;
       colors[i * 3 + 1] = c.g;
       colors[i * 3 + 2] = c.b;
@@ -191,10 +202,10 @@ export function WebGLTopology() {
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const material = new THREE.PointsMaterial({
-      size: isSmall ? 0.025 : 0.018,
+      size: 0.017,
       vertexColors: true,
       transparent: true,
-      opacity: 0.86,
+      opacity: 0.82,
       depthWrite: false,
       blending: THREE.AdditiveBlending
     });
@@ -203,7 +214,7 @@ export function WebGLTopology() {
     group.add(points);
 
     const ring = new THREE.TorusGeometry(2.3, 0.006, 8, 180);
-    const ringMat = new THREE.MeshBasicMaterial({ color: '#f59e0b', transparent: true, opacity: 0.18 });
+    const ringMat = new THREE.MeshBasicMaterial({ color: '#06b6d4', transparent: true, opacity: 0.16 });
     const ringMesh = new THREE.Mesh(ring, ringMat);
     ringMesh.rotation.x = Math.PI / 2.35;
     group.add(ringMesh);
@@ -226,36 +237,36 @@ export function WebGLTopology() {
 
     gsap.registerPlugin(ScrollTrigger);
     const rotationTween = gsap.to(group.rotation, {
-      y: Math.PI * 1.4,
-      x: Math.PI * 0.32,
+      y: Math.PI * 1.18,
+      x: Math.PI * 0.24,
       ease: 'none',
       scrollTrigger: {
         trigger: host,
         start: 'top top',
         end: 'bottom top',
-        scrub: reducedMotion ? false : 0.65
+        scrub: 0.65
       }
     });
     const scaleTween = gsap.to(group.scale, {
-      x: 1.75,
-      y: 1.75,
-      z: 1.75,
+      x: 1.62,
+      y: 1.62,
+      z: 1.62,
       ease: 'none',
       scrollTrigger: {
         trigger: host,
         start: 'top top',
         end: 'bottom top',
-        scrub: reducedMotion ? false : 0.65
+        scrub: 0.65
       }
     });
     const deconstructTween = gsap.to(scrollState, {
-      progress: reducedMotion ? 0.42 : 1,
+      progress: 1,
       ease: 'none',
       scrollTrigger: {
         trigger: host,
         start: 'top top',
         end: 'bottom top',
-        scrub: reducedMotion ? false : 0.65
+        scrub: 0.65
       }
     });
 
@@ -267,22 +278,22 @@ export function WebGLTopology() {
       const delta = Math.min(2, Math.max(0.1, (now - lastTime) / 16.667));
       lastTime = now;
       const t = clock.getElapsedTime();
-      const progress = reducedMotion ? 0.18 : scrollState.progress;
+      const progress = scrollState.progress;
 
-      const autoUv = new THREE.Vector2(0.5 + Math.cos(t * 0.21) * 0.22, 0.5 + Math.sin(t * 0.17) * 0.20);
+      const autoUv = new THREE.Vector2(0.5 + Math.cos(t * 0.17) * 0.18, 0.5 + Math.sin(t * 0.13) * 0.16);
       if (pointerActive) {
         pointerUv.set(pointer.x * 0.5 + 0.5, pointer.y * 0.5 + 0.5);
       } else {
         pointerUv.copy(autoUv);
       }
       prevPointerUv.copy(smoothedUv);
-      smoothedUv.lerp(pointerUv, pointerActive ? 0.13 : 0.04);
+      smoothedUv.lerp(pointerUv, pointerActive ? 0.11 : 0.035);
       pointerVelocity.copy(smoothedUv).sub(prevPointerUv);
 
       velocityMaterial.uniforms.uVelocity.value = velocityRead.texture;
       velocityMaterial.uniforms.uMouse.value.copy(smoothedUv);
       velocityMaterial.uniforms.uPrevMouse.value.copy(prevPointerUv);
-      velocityMaterial.uniforms.uImpulse.value = Math.min(1, pointerVelocity.length() * 42 + (pointerActive ? 0.015 : 0.035));
+      velocityMaterial.uniforms.uImpulse.value = Math.min(1, pointerVelocity.length() * 32 + (pointerActive ? 0.01 : 0.024));
       velocityMaterial.uniforms.uAspect.value = host.clientWidth / Math.max(1, host.clientHeight);
       velocityMaterial.uniforms.uDelta.value = delta;
       velocityMaterial.uniforms.uTime.value = t;
@@ -293,8 +304,8 @@ export function WebGLTopology() {
       fluidPlaneMaterial.uniforms.uVelocity.value = velocityRead.texture;
       fluidPlaneMaterial.uniforms.uTime.value = t;
 
-      group.rotation.y += reducedMotion ? 0 : 0.0014;
-      group.rotation.x += Math.sin(t * 0.22) * 0.0009;
+      group.rotation.y += 0.0011;
+      group.rotation.x += Math.sin(t * 0.18) * 0.0007;
 
       const pos = geometry.attributes.position as THREE.BufferAttribute;
       const col = geometry.attributes.color as THREE.BufferAttribute;
@@ -308,8 +319,8 @@ export function WebGLTopology() {
         const by = base[ix + 1];
         const bz = base[ix + 2];
 
-        const gridX = ((i % columns) - columns / 2) * (isSmall ? 0.16 : 0.125);
-        const gridY = ((Math.floor(i / columns) % columns) - columns / 2) * (isSmall ? 0.16 : 0.125);
+        const gridX = ((i % columns) - columns / 2) * 0.12;
+        const gridY = ((Math.floor(i / columns) % columns) - columns / 2) * 0.12;
         const gridZ = -0.85 + ((i % 7) * 0.012);
         const tx = bx * (1 - settle) + gridX * settle;
         const ty = by * (1 - settle) + gridY * settle;
@@ -318,26 +329,26 @@ export function WebGLTopology() {
         const dx = tx - px;
         const dy = ty - py;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        const magneticForce = Math.max(0, 0.68 - dist) * (isSmall ? 0.08 : 0.25) * (1 - settle * 0.45);
-        const vortexFalloff = Math.exp(-dist * dist * 1.35) * (0.06 + Math.min(0.28, pointerVelocity.length() * 8));
+        const magneticForce = Math.max(0, 0.62 - dist) * 0.18 * (1 - settle * 0.45);
+        const vortexFalloff = Math.exp(-dist * dist * 1.55) * (0.035 + Math.min(0.18, pointerVelocity.length() * 5.5));
         const tangentX = -dy * vortexFalloff;
         const tangentY = dx * vortexFalloff;
-        const jitter = reducedMotion ? 0 : 0.012;
+        const jitter = 0.007;
 
-        positions[ix] = tx + dx * magneticForce + tangentX + Math.sin(t * 2.5 + i) * jitter;
-        positions[ix + 1] = ty + dy * magneticForce + tangentY + Math.cos(t * 2.0 + i) * jitter;
-        positions[ix + 2] = tz + Math.sin(t * 1.8 + i * 0.13) * jitter * 3.2 + vortexFalloff * 0.4;
+        positions[ix] = tx + dx * magneticForce + tangentX + Math.sin(t * 1.8 + i) * jitter;
+        positions[ix + 1] = ty + dy * magneticForce + tangentY + Math.cos(t * 1.6 + i) * jitter;
+        positions[ix + 2] = tz + Math.sin(t * 1.3 + i * 0.13) * jitter * 2.4 + vortexFalloff * 0.32;
 
-        const hot = Math.min(1, magneticForce * 4.8 + vortexFalloff * 3.5);
+        const hot = Math.min(1, magneticForce * 4.4 + vortexFalloff * 3.1);
         col.setXYZ(i,
-          copper.r * (1 - hot) + green.r * hot,
-          copper.g * (1 - hot) + green.g * hot,
-          copper.b * (1 - hot) + green.b * hot
+          cyan.r * (1 - hot) + spark.r * hot,
+          cyan.g * (1 - hot) + spark.g * hot,
+          cyan.b * (1 - hot) + spark.b * hot
         );
       }
 
-      material.opacity = 0.86 - progress * 0.32;
-      ringMat.opacity = 0.18 - progress * 0.08;
+      material.opacity = 0.82 - progress * 0.28;
+      ringMat.opacity = 0.16 - progress * 0.06;
       pos.needsUpdate = true;
       col.needsUpdate = true;
       renderer.render(scene, camera);
