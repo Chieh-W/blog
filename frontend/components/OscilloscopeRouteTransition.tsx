@@ -35,6 +35,7 @@ const DIVE_FRAGMENT_SHADER = `
   uniform vec2 uCardSize;
   uniform float uProgress;
   uniform float uTime;
+  uniform float uThemeFactor;
 
   float easeOutCubic(float x) {
     return 1.0 - pow(1.0 - clamp(x, 0.0, 1.0), 3.0);
@@ -64,6 +65,7 @@ const DIVE_FRAGMENT_SHADER = `
 
   void main() {
     float p = clamp(uProgress, 0.0, 1.0);
+    float theme = clamp(uThemeFactor, 0.0, 1.0);
     float lock = easeOutCubic(smoothstep(0.0, 0.27, p));
     float reveal = easeInOut(smoothstep(0.26, 0.58, p));
     float dive = easeInOut(smoothstep(0.56, 1.0, p));
@@ -83,10 +85,16 @@ const DIVE_FRAGMENT_SHADER = `
     float lens = smoothstep(0.92, 0.10, length(centeredScreen * vec2(uResolution.x / max(1.0, uResolution.y), 1.0)));
     float dim = mix(0.72, 0.92, lock) * (1.0 - cardMask * 0.42);
 
-    vec3 voidColor = vec3(0.007, 0.024, 0.070);
-    vec3 cyan = vec3(0.024, 0.714, 0.832);
-    vec3 spark = vec3(0.961, 0.620, 0.043);
-    vec3 color = voidColor * dim + cyan * 0.018 * lens;
+    vec3 darkVoid = vec3(0.007, 0.024, 0.070);
+    vec3 dayPaper = vec3(0.945, 0.965, 0.985);
+    vec3 darkCyan = vec3(0.024, 0.714, 0.832);
+    vec3 dayInk = vec3(0.118, 0.161, 0.231);
+    vec3 darkSpark = vec3(0.961, 0.620, 0.043);
+    vec3 dayOrange = vec3(0.761, 0.255, 0.047);
+    vec3 voidColor = mix(darkVoid, dayPaper, theme);
+    vec3 cyan = mix(darkCyan, dayInk, theme);
+    vec3 spark = mix(darkSpark, dayOrange, theme);
+    vec3 color = voidColor * mix(dim, 0.92, theme) + cyan * mix(0.018, 0.026, theme) * lens;
 
     float blueprintGrid = lineGrid(local, vec2(12.0, 8.0), 0.018) * cardMask;
     float fineGrid = lineGrid(local + vec2(0.013, 0.021), vec2(32.0, 20.0), 0.006) * cardMask;
@@ -103,10 +111,11 @@ const DIVE_FRAGMENT_SHADER = `
     color += cyan * aperture * reveal * 0.07;
 
     float bloom = node * dive + edge * reveal * 0.28 + corners * 0.22;
-    color += mix(cyan, spark, node) * bloom * 0.50;
-    color = mix(color, vec3(0.92, 0.98, 1.0), smoothstep(0.90, 1.0, p) * node * 0.72);
+    color += mix(cyan, spark, node) * bloom * mix(0.50, 0.18, theme);
+    color = mix(color, mix(vec3(0.92, 0.98, 1.0), vec3(0.08, 0.10, 0.13), theme), smoothstep(0.90, 1.0, p) * node * mix(0.72, 0.24, theme));
 
     float alpha = min(1.0, 0.64 + lock * 0.25 + reveal * 0.08 + dive * 0.18);
+    alpha = mix(alpha, 0.70 + edge * 0.18 + blueprintGrid * 0.10, theme);
     gl_FragColor = vec4(color, alpha);
   }
 `;
@@ -117,6 +126,7 @@ const FOCUS_FRAGMENT_SHADER = `
   uniform vec2 uResolution;
   uniform float uProgress;
   uniform float uTime;
+  uniform float uThemeFactor;
 
   float easeOut(float x) {
     x = clamp(x, 0.0, 1.0);
@@ -125,16 +135,17 @@ const FOCUS_FRAGMENT_SHADER = `
 
   void main() {
     float p = easeOut(uProgress);
+    float theme = clamp(uThemeFactor, 0.0, 1.0);
     vec2 centered = vUv - 0.5;
     float aspect = uResolution.x / max(1.0, uResolution.y);
     float lens = smoothstep(0.96, 0.08, length(centered * vec2(aspect, 1.0)));
     float scan = 0.5 + 0.5 * sin(vUv.y * 980.0 + uTime * 54.0);
     float fine = 0.5 + 0.5 * sin((vUv.x + vUv.y) * 210.0 - uTime * 24.0);
-    vec3 cyan = vec3(0.024, 0.714, 0.832);
-    vec3 spark = vec3(0.961, 0.620, 0.043);
-    vec3 color = cyan * (scan * 0.10 + fine * 0.035) * lens;
-    color += mix(cyan, spark, p) * (1.0 - p) * 0.08;
-    float alpha = (1.0 - p) * 0.34 + scan * (1.0 - p) * 0.055;
+    vec3 cyan = mix(vec3(0.024, 0.714, 0.832), vec3(0.118, 0.161, 0.231), theme);
+    vec3 spark = mix(vec3(0.961, 0.620, 0.043), vec3(0.761, 0.255, 0.047), theme);
+    vec3 color = cyan * (scan * mix(0.10, 0.045, theme) + fine * mix(0.035, 0.028, theme)) * lens;
+    color += mix(cyan, spark, p) * (1.0 - p) * mix(0.08, 0.04, theme);
+    float alpha = (1.0 - p) * mix(0.34, 0.18, theme) + scan * (1.0 - p) * mix(0.055, 0.028, theme);
     gl_FragColor = vec4(color, alpha);
   }
 `;
@@ -175,16 +186,20 @@ function routeFromHref(href: string) {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+function readThemeFactor() {
+  return document.documentElement.dataset.theme === 'day' ? 1 : 0;
+}
+
 function resetRouteArtifacts() {
   document.body.classList.remove('optical-routing-active');
+  document.body.classList.remove('focus-resolution-active');
   document.body.style.overflow = '';
-  document.querySelectorAll('.blueprint-route-canvas').forEach((node) => node.remove());
+  document.querySelectorAll('.blueprint-route-canvas, .focus-resolution-canvas').forEach((node) => node.remove());
   document.querySelectorAll<HTMLElement>('[data-route-focus="true"]').forEach((node) => node.removeAttribute('data-route-focus'));
   document.querySelectorAll<HTMLElement>('.mobile-route-exit').forEach((node) => node.classList.remove('mobile-route-exit'));
 }
 
 function dispose(state: DiveState) {
-  if (state.doneFired) return;
   state.doneFired = true;
   cancelAnimationFrame(state.raf);
   state.gl.deleteBuffer(state.buffer);
@@ -198,6 +213,7 @@ function dispose(state: DiveState) {
 
 function runFocusResolution() {
   const duration = 360;
+  const themeFactor = readThemeFactor();
   document.body.classList.add('focus-resolution-active');
 
   const finish = () => {
@@ -231,6 +247,7 @@ function runFocusResolution() {
   const uResolution = gl.getUniformLocation(program, 'uResolution');
   const uProgress = gl.getUniformLocation(program, 'uProgress');
   const uTime = gl.getUniformLocation(program, 'uTime');
+  const uThemeFactor = gl.getUniformLocation(program, 'uThemeFactor');
   const startedAt = performance.now();
   let raf = 0;
 
@@ -254,6 +271,7 @@ function runFocusResolution() {
     gl.uniform2f(uResolution, window.innerWidth * dpr, window.innerHeight * dpr);
     gl.uniform1f(uProgress, progress);
     gl.uniform1f(uTime, elapsed / 1000);
+    gl.uniform1f(uThemeFactor, themeFactor);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
     if (progress >= 1) {
@@ -295,6 +313,7 @@ function runBlueprintDive(target: HTMLElement, onCommit: () => void, onDone: () 
 
   const program = createProgram(gl, DIVE_FRAGMENT_SHADER);
   const buffer = gl.createBuffer();
+  const themeFactor = readThemeFactor();
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
 
@@ -341,6 +360,7 @@ function runBlueprintDive(target: HTMLElement, onCommit: () => void, onDone: () 
   const uCardSize = gl.getUniformLocation(program, 'uCardSize');
   const uProgress = gl.getUniformLocation(program, 'uProgress');
   const uTime = gl.getUniformLocation(program, 'uTime');
+  const uThemeFactor = gl.getUniformLocation(program, 'uThemeFactor');
 
   const render = (now: number) => {
     const elapsed = now - state.startedAt;
@@ -361,6 +381,7 @@ function runBlueprintDive(target: HTMLElement, onCommit: () => void, onDone: () 
     gl.uniform2f(uCardSize, targetSize.x * dpr, targetSize.y * dpr);
     gl.uniform1f(uProgress, progress);
     gl.uniform1f(uTime, elapsed / 1000);
+    gl.uniform1f(uThemeFactor, themeFactor);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
     if (progress >= 1 && !state.doneFired) {
@@ -404,6 +425,7 @@ export function OscilloscopeRouteTransition() {
         dispose(state);
         activeRef.current = null;
         pendingHrefRef.current = null;
+        resetRouteArtifacts();
       }, 260);
       return;
     }
@@ -449,14 +471,29 @@ export function OscilloscopeRouteTransition() {
       }
       pendingHrefRef.current = null;
       resetRouteArtifacts();
+      window.setTimeout(bindAutoCards, 0);
     };
 
     window.addEventListener('pageshow', cleanupOnRestore);
     window.addEventListener('popstate', cleanupOnRestore);
+    window.addEventListener('visibilitychange', cleanupOnRestore);
 
     const onClick = (event: MouseEvent) => {
       const anchor = isRoutableAnchor(event.target);
-      if (!anchor || activeRef.current) return;
+      if (!anchor) return;
+
+      if (activeRef.current) {
+        const active = activeRef.current;
+        const stale = !active.canvas.isConnected || !active.target.isConnected || !document.body.classList.contains('optical-routing-active');
+        if (stale) {
+          activeRef.current = null;
+          pendingHrefRef.current = null;
+          resetRouteArtifacts();
+        } else {
+          return;
+        }
+      }
+
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
 
       event.preventDefault();
@@ -480,6 +517,7 @@ export function OscilloscopeRouteTransition() {
           () => {
             activeRef.current = null;
             pendingHrefRef.current = null;
+            resetRouteArtifacts();
           }
         );
       } catch {
@@ -495,6 +533,7 @@ export function OscilloscopeRouteTransition() {
       mutationObserver.disconnect();
       window.removeEventListener('pageshow', cleanupOnRestore);
       window.removeEventListener('popstate', cleanupOnRestore);
+      window.removeEventListener('visibilitychange', cleanupOnRestore);
       document.removeEventListener('click', onClick, true);
     };
   }, [router]);
