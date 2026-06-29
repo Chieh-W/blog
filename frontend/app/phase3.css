@@ -81,14 +81,115 @@ body.optical-routing-active .article-card[data-route-focus="true"] .blueprint-wi
   opacity: 1;
 }
 
-.blueprint-route-canvas {
+body.optical-routing-active .article-card[data-route-focus="true"] .blueprint-wireframe {
+  animation: wireframe-snap 1320ms cubic-bezier(.18,1.18,.28,1) both;
+}
+
+body.optical-routing-active .article-card[data-route-focus="true"]::before,
+body.optical-routing-active .article-card[data-route-focus="true"]::after {
+  opacity: 0.92;
+  animation: corner-snap 1320ms cubic-bezier(.18,1.18,.28,1) both;
+}
+
+@keyframes wireframe-snap {
+  0%, 58% { transform: scale(1); filter: brightness(1); }
+  72% { transform: scale(0.986); filter: brightness(1.35); }
+  84% { transform: scale(1.012); filter: brightness(1.12); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+@keyframes corner-snap {
+  0%, 60% { transform: translate(3px, -2px) scale(1); }
+  74% { transform: translate(0, 0) scale(0.992); }
+  88%, 100% { transform: translate(3px, -2px) scale(1); }
+}
+
+.blueprint-route-canvas,
+.focus-resolution-canvas {
   position: fixed;
   inset: 0;
   width: 100vw;
   height: 100vh;
   pointer-events: none;
-  z-index: 10000;
   background: transparent;
+}
+
+.blueprint-route-canvas { z-index: 10000; }
+.focus-resolution-canvas {
+  z-index: 10002;
+  mix-blend-mode: screen;
+}
+
+body.focus-resolution-active .page-shell {
+  filter: blur(10px) saturate(0.72) brightness(0.72);
+  opacity: 0.88;
+  transform: translateZ(0) scale(1.004);
+  will-change: transform, opacity, filter;
+  transition: filter 220ms cubic-bezier(.16,1,.3,1), opacity 220ms ease, transform 220ms cubic-bezier(.16,1,.3,1);
+}
+
+.page-shell,
+.article-intro,
+.article-surface,
+.article-body,
+.toc {
+  transform: translateZ(0);
+  will-change: transform, opacity, filter;
+}
+
+.post-detail-shell .article-surface {
+  position: relative;
+}
+
+.post-detail-shell .article-intro {
+  animation: title-silk-reveal 720ms cubic-bezier(.16,1,.3,1) both;
+}
+
+.post-detail-shell .toc {
+  animation: layer-pop 620ms cubic-bezier(.16,1,.3,1) 140ms both;
+}
+
+.post-detail-shell .article-body {
+  position: relative;
+  overflow: hidden;
+  animation: laser-body-reveal 900ms cubic-bezier(.16,1,.3,1) 220ms both;
+}
+
+.post-detail-shell .article-body::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 80px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-100%);
+  background: linear-gradient(180deg, transparent, rgba(6, 182, 212, 0.20), transparent);
+  animation: laser-scan 980ms cubic-bezier(.16,1,.3,1) 220ms both;
+  mix-blend-mode: screen;
+}
+
+@keyframes title-silk-reveal {
+  0% { opacity: 0; filter: blur(12px); clip-path: inset(0 50% 0 50%); transform: translateY(12px) translateZ(0); }
+  68% { opacity: 1; filter: blur(1px); clip-path: inset(0 0 0 0); transform: translateY(0) translateZ(0); }
+  100% { opacity: 1; filter: blur(0); clip-path: inset(0 0 0 0); transform: translateY(0) translateZ(0); }
+}
+
+@keyframes layer-pop {
+  0% { opacity: 0; transform: translateY(16px) translateZ(0); filter: blur(8px); }
+  100% { opacity: 1; transform: translateY(0) translateZ(0); filter: blur(0); }
+}
+
+@keyframes laser-body-reveal {
+  0% { opacity: 0; transform: translateY(18px) translateZ(0); filter: blur(10px); clip-path: inset(0 0 100% 0); }
+  100% { opacity: 1; transform: translateY(0) translateZ(0); filter: blur(0); clip-path: inset(0 0 0 0); }
+}
+
+@keyframes laser-scan {
+  0% { opacity: 0; transform: translateY(-100%); }
+  18% { opacity: 0.8; }
+  100% { opacity: 0; transform: translateY(900%); }
 }
 
 .log-curvature-overlay {
@@ -140,7 +241,8 @@ body.optical-routing-active .article-card[data-route-focus="true"] .blueprint-wi
 
 @media (max-width: 768px) {
   .log-curvature-overlay,
-  .blueprint-route-canvas {
+  .blueprint-route-canvas,
+  .focus-resolution-canvas {
     display: none;
   }
 
@@ -160,7 +262,18 @@ body.optical-routing-active .article-card[data-route-focus="true"] .blueprint-wi
   }
 
   .log-curvature-overlay,
-  .blueprint-route-canvas {
+  .blueprint-route-canvas,
+  .focus-resolution-canvas {
     display: none;
+  }
+
+  .post-detail-shell .article-intro,
+  .post-detail-shell .toc,
+  .post-detail-shell .article-body,
+  .post-detail-shell .article-body::after,
+  body.optical-routing-active .article-card[data-route-focus="true"] .blueprint-wireframe,
+  body.optical-routing-active .article-card[data-route-focus="true"]::before,
+  body.optical-routing-active .article-card[data-route-focus="true"]::after {
+    animation: none !important;
   }
 }
