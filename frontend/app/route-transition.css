@@ -1,0 +1,94 @@
+.route-dive-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  pointer-events: none;
+  overflow: hidden;
+  background: rgba(2, 6, 23, 0.20);
+}
+
+.route-dive-frame {
+  position: fixed;
+  border: 1px solid rgba(6, 182, 212, 0.82);
+  background:
+    linear-gradient(90deg, rgba(6, 182, 212, 0.20) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(6, 182, 212, 0.14) 1px, transparent 1px),
+    radial-gradient(circle at 72% 34%, rgba(245, 158, 11, 0.28), transparent 9px),
+    rgba(2, 6, 23, 0.28);
+  background-size: 42px 42px, 42px 42px, auto, auto;
+  box-shadow:
+    0 0 0 1px rgba(6, 182, 212, 0.18),
+    0 0 54px rgba(6, 182, 212, 0.20),
+    inset 0 0 44px rgba(6, 182, 212, 0.08);
+  transform: translate3d(0, 0, 0) scale(1);
+  transform-origin: center center;
+  transition:
+    transform 780ms cubic-bezier(.16,1,.3,1),
+    filter 780ms cubic-bezier(.16,1,.3,1),
+    opacity 280ms ease;
+  will-change: transform, filter, opacity;
+}
+
+.route-dive-frame::before,
+.route-dive-frame::after {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  pointer-events: none;
+  border: 1px solid rgba(6, 182, 212, 0.38);
+  clip-path: polygon(0 0, 18% 0, 18% 2px, 2px 2px, 2px 18%, 0 18%, 0 0, 100% 0, 82% 0, 82% 2px, calc(100% - 2px) 2px, calc(100% - 2px) 18%, 100% 18%, 100% 0, 100% 100%, 82% 100%, 82% calc(100% - 2px), calc(100% - 2px) calc(100% - 2px), calc(100% - 2px) 82%, 100% 82%, 100% 100%, 0 100%, 18% 100%, 18% calc(100% - 2px), 2px calc(100% - 2px), 2px 82%, 0 82%);
+}
+
+.route-dive-frame::after {
+  inset: 28% 22%;
+  border-radius: 999px;
+  opacity: 0.5;
+  clip-path: none;
+}
+
+.route-dive-frame.is-dive-active {
+  transform: translate3d(var(--route-dx), var(--route-dy), 0) scale(8.8);
+  filter: brightness(1.18) saturate(1.14);
+}
+
+.route-dive-shell[data-theme='day'] {
+  background: rgba(241, 245, 249, 0.42);
+}
+
+.route-dive-shell[data-theme='day'] .route-dive-frame {
+  border-color: rgba(30, 41, 59, 0.72);
+  background:
+    linear-gradient(90deg, rgba(30, 41, 59, 0.18) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(30, 41, 59, 0.13) 1px, transparent 1px),
+    radial-gradient(circle at 72% 34%, rgba(194, 65, 12, 0.24), transparent 9px),
+    rgba(248, 250, 252, 0.72);
+  background-size: 42px 42px, 42px 42px, auto, auto;
+  box-shadow: 0 28px 90px rgba(15, 23, 42, 0.12), inset 0 0 0 1px rgba(30, 41, 59, 0.10);
+}
+
+.route-dive-shell[data-theme='day'] .route-dive-frame::before,
+.route-dive-shell[data-theme='day'] .route-dive-frame::after {
+  border-color: rgba(30, 41, 59, 0.38);
+}
+
+.focus-resolution-scan {
+  background:
+    repeating-linear-gradient(0deg, rgba(6, 182, 212, 0.00) 0 4px, rgba(6, 182, 212, 0.12) 5px, rgba(6, 182, 212, 0.00) 7px),
+    radial-gradient(circle at center, rgba(6, 182, 212, 0.12), transparent 60%);
+  opacity: 0.68;
+  animation: focus-resolution-out 360ms cubic-bezier(.16,1,.3,1) forwards;
+}
+
+.focus-resolution-scan[data-theme='day'] {
+  background:
+    repeating-linear-gradient(0deg, rgba(30, 41, 59, 0.00) 0 4px, rgba(30, 41, 59, 0.08) 5px, rgba(30, 41, 59, 0.00) 7px),
+    radial-gradient(circle at center, rgba(30, 41, 59, 0.10), transparent 60%);
+  opacity: 0.48;
+  mix-blend-mode: multiply;
+}
+
+@keyframes focus-resolution-out {
+  0% { opacity: 0.72; filter: blur(8px); }
+  38% { opacity: 0.48; filter: blur(2px); }
+  100% { opacity: 0; filter: blur(0); }
+}
