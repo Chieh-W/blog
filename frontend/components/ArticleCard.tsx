@@ -3,12 +3,21 @@ import type { BlogPost } from '@/lib/posts';
 
 export function ArticleCard({ post }: { post: BlogPost }) {
   return (
-    <Link className="article-card" href={`/posts/${post.slug}`} data-reveal data-log-card="true" data-osc-route="true">
-      <div className="article-meta">{post.category} · {post.date}</div>
-      <h3>{post.title}</h3>
-      <p>{post.excerpt}</p>
-      <div className="tag-row">
-        {post.tags.map((tag) => <span className="tag" key={tag}>#{tag}</span>)}
+    <Link
+      className="article-card"
+      href={`/posts/${post.slug}`}
+      data-reveal
+      data-log-card="true"
+      data-osc-route="true"
+    >
+      <div className="blueprint-wireframe" aria-hidden />
+      <div className="card-content">
+        <div className="article-meta">{post.category} · {post.date}</div>
+        <h3>{post.title}</h3>
+        <p>{post.excerpt}</p>
+        <div className="tag-row">
+          {post.tags.map((tag) => <span className="tag" key={tag}>#{tag}</span>)}
+        </div>
       </div>
       <div className="rgb-scan" />
     </Link>
