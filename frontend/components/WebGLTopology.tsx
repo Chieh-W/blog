@@ -65,6 +65,7 @@ const FLUID_FRAGMENT = `
   varying vec2 vUv;
   uniform sampler2D uVelocity;
   uniform float uTime;
+  uniform float uThemeFactor;
 
   vec2 decode(vec4 value) {
     return value.xy * 2.0 - 1.0;
@@ -81,13 +82,23 @@ const FLUID_FRAGMENT = `
     float trace = smoothstep(0.014, 0.12, speed);
     float grid = gridLine(vUv + velocity * 0.06, vec2(26.0, 16.0), 0.018);
     float scan = 0.5 + 0.5 * sin(vUv.y * 86.0 + uTime * 1.6);
-    vec3 cyan = vec3(0.024, 0.714, 0.832);
-    vec3 spark = vec3(0.961, 0.620, 0.043);
-    vec3 color = mix(cyan, spark, clamp(speed * 2.4, 0.0, 1.0));
-    float alpha = grid * 0.032 + trace * (0.045 + scan * 0.026);
-    gl_FragColor = vec4(color, alpha);
+    vec3 darkCyan = vec3(0.024, 0.714, 0.832);
+    vec3 darkSpark = vec3(0.961, 0.620, 0.043);
+    vec3 dayInk = vec3(0.118, 0.161, 0.231);
+    vec3 dayOrange = vec3(0.761, 0.255, 0.047);
+    vec3 darkColor = mix(darkCyan, darkSpark, clamp(speed * 2.4, 0.0, 1.0));
+    vec3 dayColor = mix(dayInk, dayOrange, clamp(speed * 2.1 + grid * 0.24, 0.0, 1.0));
+    vec3 color = mix(darkColor, dayColor, uThemeFactor);
+    float darkAlpha = grid * 0.032 + trace * (0.045 + scan * 0.026);
+    float dayAlpha = grid * 0.020 + trace * 0.018;
+    gl_FragColor = vec4(color, mix(darkAlpha, dayAlpha, uThemeFactor));
   }
 `;
+
+function readThemeFactor() {
+  if (typeof document === 'undefined') return 0;
+  return document.documentElement.dataset.theme === 'day' ? 1 : 0;
+}
 
 export function WebGLTopology() {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -156,6 +167,14 @@ export function WebGLTopology() {
     renderer.setRenderTarget(null);
     passMesh.material = velocityMaterial;
 
+    let themeTarget = readThemeFactor();
+    let themeFactor = themeTarget;
+    const onThemeChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ theme?: string }>).detail;
+      themeTarget = detail?.theme === 'day' ? 1 : 0;
+    };
+    window.addEventListener('nexus-theme-change', onThemeChange);
+
     const fluidPlaneMaterial = new THREE.ShaderMaterial({
       vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
       fragmentShader: FLUID_FRAGMENT,
@@ -165,7 +184,8 @@ export function WebGLTopology() {
       blending: THREE.AdditiveBlending,
       uniforms: {
         uVelocity: { value: velocityRead.texture },
-        uTime: { value: 0 }
+        uTime: { value: 0 },
+        uThemeFactor: { value: themeFactor }
       }
     });
     const fluidPlane = new THREE.Mesh(new THREE.PlaneGeometry(12, 8), fluidPlaneMaterial);
@@ -177,8 +197,12 @@ export function WebGLTopology() {
     const positions = new Float32Array(count * 3);
     const base = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
-    const cyan = new THREE.Color('#06b6d4');
-    const spark = new THREE.Color('#f59e0b');
+    const darkBase = new THREE.Color('#06b6d4');
+    const darkHot = new THREE.Color('#f59e0b');
+    const dayBase = new THREE.Color('#1e293b');
+    const dayHot = new THREE.Color('#c2410c');
+    const baseColor = new THREE.Color();
+    const hotColor = new THREE.Color();
 
     for (let i = 0; i < count; i++) {
       const phi = Math.acos(2 * Math.random() - 1);
@@ -191,7 +215,7 @@ export function WebGLTopology() {
       positions[i * 3 + 1] = base[i * 3 + 1] = y;
       positions[i * 3 + 2] = base[i * 3 + 2] = z;
       const mix = Math.random() * 0.18;
-      const c = cyan.clone().lerp(spark, mix);
+      const c = darkBase.clone().lerp(darkHot, mix);
       colors[i * 3] = c.r;
       colors[i * 3 + 1] = c.g;
       colors[i * 3 + 2] = c.b;
@@ -279,6 +303,7 @@ export function WebGLTopology() {
       lastTime = now;
       const t = clock.getElapsedTime();
       const progress = scrollState.progress;
+      themeFactor += (themeTarget - themeFactor) * 0.055;
 
       const autoUv = new THREE.Vector2(0.5 + Math.cos(t * 0.17) * 0.18, 0.5 + Math.sin(t * 0.13) * 0.16);
       if (pointerActive) {
@@ -303,6 +328,7 @@ export function WebGLTopology() {
       [velocityRead, velocityWrite] = [velocityWrite, velocityRead];
       fluidPlaneMaterial.uniforms.uVelocity.value = velocityRead.texture;
       fluidPlaneMaterial.uniforms.uTime.value = t;
+      fluidPlaneMaterial.uniforms.uThemeFactor.value = themeFactor;
 
       group.rotation.y += 0.0011;
       group.rotation.x += Math.sin(t * 0.18) * 0.0007;
@@ -312,6 +338,8 @@ export function WebGLTopology() {
       const px = (smoothedUv.x - 0.5) * 5.4;
       const py = (smoothedUv.y - 0.5) * 4.0;
       const settle = Math.min(1, progress * 0.72);
+      baseColor.copy(darkBase).lerp(dayBase, themeFactor);
+      hotColor.copy(darkHot).lerp(dayHot, themeFactor);
 
       for (let i = 0; i < count; i++) {
         const ix = i * 3;
@@ -333,7 +361,7 @@ export function WebGLTopology() {
         const vortexFalloff = Math.exp(-dist * dist * 1.55) * (0.035 + Math.min(0.18, pointerVelocity.length() * 5.5));
         const tangentX = -dy * vortexFalloff;
         const tangentY = dx * vortexFalloff;
-        const jitter = 0.007;
+        const jitter = 0.007 * (1 - themeFactor * 0.35);
 
         positions[ix] = tx + dx * magneticForce + tangentX + Math.sin(t * 1.8 + i) * jitter;
         positions[ix + 1] = ty + dy * magneticForce + tangentY + Math.cos(t * 1.6 + i) * jitter;
@@ -341,14 +369,15 @@ export function WebGLTopology() {
 
         const hot = Math.min(1, magneticForce * 4.4 + vortexFalloff * 3.1);
         col.setXYZ(i,
-          cyan.r * (1 - hot) + spark.r * hot,
-          cyan.g * (1 - hot) + spark.g * hot,
-          cyan.b * (1 - hot) + spark.b * hot
+          baseColor.r * (1 - hot) + hotColor.r * hot,
+          baseColor.g * (1 - hot) + hotColor.g * hot,
+          baseColor.b * (1 - hot) + hotColor.b * hot
         );
       }
 
-      material.opacity = 0.82 - progress * 0.28;
-      ringMat.opacity = 0.16 - progress * 0.06;
+      material.opacity = (0.82 - progress * 0.28) * (1 - themeFactor * 0.42);
+      ringMat.opacity = (0.16 - progress * 0.06) * (1 - themeFactor * 0.48);
+      ringMat.color.copy(baseColor);
       pos.needsUpdate = true;
       col.needsUpdate = true;
       renderer.render(scene, camera);
@@ -368,6 +397,7 @@ export function WebGLTopology() {
       cancelAnimationFrame(frameId);
       window.removeEventListener('resize', resize);
       window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('nexus-theme-change', onThemeChange);
       rotationTween.kill();
       scaleTween.kill();
       deconstructTween.kill();
