@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type MouseEvent } from 'react';
 import type { ThemeMode } from './ThemeProvider';
 
 function setTheme(theme: ThemeMode) {
@@ -10,7 +10,7 @@ function setTheme(theme: ThemeMode) {
   window.dispatchEvent(new CustomEvent('nexus-theme-change', { detail: { theme } }));
 }
 
-function runOpticalWipe(event: React.MouseEvent<HTMLButtonElement>, nextTheme: ThemeMode) {
+function runOpticalWipe(event: MouseEvent<HTMLButtonElement>, nextTheme: ThemeMode) {
   const wipe = document.createElement('div');
   wipe.className = 'theme-optical-wipe';
   wipe.dataset.targetTheme = nextTheme;
@@ -36,7 +36,7 @@ export function ThemeToggle() {
     return () => window.removeEventListener('nexus-theme-change', onThemeChange);
   }, []);
 
-  const toggle = (event: React.MouseEvent<HTMLButtonElement>) => {
+  const toggle = (event: MouseEvent<HTMLButtonElement>) => {
     const nextTheme: ThemeMode = theme === 'day' ? 'dark' : 'day';
     runOpticalWipe(event, nextTheme);
     window.setTimeout(() => setTheme(nextTheme), 120);
