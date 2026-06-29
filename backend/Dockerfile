@@ -76,7 +76,7 @@ RUN set -eux; \
       done; \
       exit 1; \
     }; \
-    apk_add_with_retry vips-dev
+    apk_add_with_retry vips-dev su-exec
 
 WORKDIR /opt/app
 
@@ -86,9 +86,18 @@ COPY --from=build /opt/app ./
 
 RUN npm prune --omit=dev \
     && npm cache clean --force \
-    && chown -R node:node /opt/app
+    && mkdir -p /opt/app/data /opt/app/public/uploads \
+    && chown -R node:node /opt/app \
+    && printf '%s\n' \
+      '#!/bin/sh' \
+      'set -e' \
+      'mkdir -p /opt/app/data /opt/app/public/uploads' \
+      'chown -R node:node /opt/app/data /opt/app/public/uploads' \
+      'exec su-exec node "$@"' \
+      > /usr/local/bin/docker-entrypoint.sh \
+    && chmod +x /usr/local/bin/docker-entrypoint.sh
 
-USER node
+ENTRYPOINT ["docker-entrypoint.sh"]
 
 EXPOSE 1337
 
