@@ -1,400 +1,76 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-
-type DiveState = {
-  canvas: HTMLCanvasElement;
-  gl: WebGLRenderingContext;
-  program: WebGLProgram;
-  buffer: WebGLBuffer | null;
-  raf: number;
-  commitFired: boolean;
-  doneFired: boolean;
-  startedAt: number;
-  target: HTMLElement;
-  originalBodyOverflow: string;
-  onCommit: () => void;
-  onDone: () => void;
-};
-
-const VERTEX_SHADER = `
-  attribute vec2 aPosition;
-  varying vec2 vUv;
-  void main() {
-    vUv = aPosition * 0.5 + 0.5;
-    gl_Position = vec4(aPosition, 0.0, 1.0);
-  }
-`;
-
-const DIVE_FRAGMENT_SHADER = `
-  precision mediump float;
-  varying vec2 vUv;
-  uniform vec2 uResolution;
-  uniform vec2 uCardCenter;
-  uniform vec2 uCardSize;
-  uniform float uProgress;
-  uniform float uTime;
-  uniform float uThemeFactor;
-
-  float easeOutCubic(float x) {
-    return 1.0 - pow(1.0 - clamp(x, 0.0, 1.0), 3.0);
-  }
-
-  float easeInOut(float x) {
-    x = clamp(x, 0.0, 1.0);
-    return x * x * (3.0 - 2.0 * x);
-  }
-
-  float lineGrid(vec2 uv, vec2 density, float width) {
-    vec2 grid = abs(fract(uv * density) - 0.5);
-    return 1.0 - smoothstep(width, width + 0.015, min(grid.x, grid.y));
-  }
-
-  float bracket(vec2 card, float snap) {
-    vec2 a = abs(card);
-    float arm = mix(0.150, 0.098, snap);
-    float width = mix(0.006, 0.010, snap);
-    float outerX = 1.0 - smoothstep(width, width + 0.004, abs(a.x - 0.5));
-    float outerY = 1.0 - smoothstep(width, width + 0.004, abs(a.y - 0.5));
-    float nearCorner = step(0.5 - arm, a.x) * step(0.5 - arm, a.y);
-    float armX = outerX * step(a.y, 0.5) * step(0.5 - arm, a.y);
-    float armY = outerY * step(a.x, 0.5) * step(0.5 - arm, a.x);
-    return max(armX, armY) * nearCorner;
-  }
-
-  void main() {
-    float p = clamp(uProgress, 0.0, 1.0);
-    float theme = clamp(uThemeFactor, 0.0, 1.0);
-    float lock = easeOutCubic(smoothstep(0.0, 0.27, p));
-    float reveal = easeInOut(smoothstep(0.26, 0.58, p));
-    float dive = easeInOut(smoothstep(0.56, 1.0, p));
-    float snap = sin(smoothstep(0.70, 0.88, p) * 3.14159265);
-
-    vec2 pixel = vec2(vUv.x * uResolution.x, (1.0 - vUv.y) * uResolution.y);
-    vec2 center = mix(uCardCenter, uResolution * 0.5, dive * 0.88);
-    vec2 size = max(vec2(1.0), uCardSize * mix(1.0, 9.5, dive) * (1.0 - snap * 0.018));
-    vec2 local = (pixel - center) / size + 0.5;
-    vec2 card = local - 0.5;
-
-    float rectDistance = max(abs(card.x), abs(card.y));
-    float cardMask = 1.0 - smoothstep(0.50, 0.515, rectDistance);
-    float edge = smoothstep(0.515, 0.49, rectDistance) - smoothstep(0.49, 0.45, rectDistance);
-
-    vec2 centeredScreen = vUv - 0.5;
-    float lens = smoothstep(0.92, 0.10, length(centeredScreen * vec2(uResolution.x / max(1.0, uResolution.y), 1.0)));
-    float dim = mix(0.72, 0.92, lock) * (1.0 - cardMask * 0.42);
-
-    vec3 darkVoid = vec3(0.007, 0.024, 0.070);
-    vec3 dayPaper = vec3(0.945, 0.965, 0.985);
-    vec3 darkCyan = vec3(0.024, 0.714, 0.832);
-    vec3 dayInk = vec3(0.118, 0.161, 0.231);
-    vec3 darkSpark = vec3(0.961, 0.620, 0.043);
-    vec3 dayOrange = vec3(0.761, 0.255, 0.047);
-    vec3 voidColor = mix(darkVoid, dayPaper, theme);
-    vec3 cyan = mix(darkCyan, dayInk, theme);
-    vec3 spark = mix(darkSpark, dayOrange, theme);
-    vec3 color = voidColor * mix(dim, 0.92, theme) + cyan * mix(0.018, 0.026, theme) * lens;
-
-    float blueprintGrid = lineGrid(local, vec2(12.0, 8.0), 0.018) * cardMask;
-    float fineGrid = lineGrid(local + vec2(0.013, 0.021), vec2(32.0, 20.0), 0.006) * cardMask;
-    float crossX = 1.0 - smoothstep(0.002, 0.010, abs(local.x - 0.72));
-    float crossY = 1.0 - smoothstep(0.002, 0.010, abs(local.y - 0.34));
-    float node = 1.0 - smoothstep(0.0, mix(0.055, 0.22, dive), distance(local, vec2(0.72, 0.34)));
-    float aperture = smoothstep(0.36, 0.08, abs(rectDistance - 0.5));
-    float corners = bracket(card, snap);
-
-    color += cyan * (edge * 1.15 + blueprintGrid * 0.24 + fineGrid * 0.12) * (0.22 + reveal * 1.2);
-    color += cyan * (crossX + crossY) * 0.16 * reveal * cardMask;
-    color += cyan * corners * (0.55 + snap * 1.2);
-    color += spark * node * (0.40 + dive * 1.45 + snap * 0.32);
-    color += cyan * aperture * reveal * 0.07;
-
-    float bloom = node * dive + edge * reveal * 0.28 + corners * 0.22;
-    color += mix(cyan, spark, node) * bloom * mix(0.50, 0.18, theme);
-    color = mix(color, mix(vec3(0.92, 0.98, 1.0), vec3(0.08, 0.10, 0.13), theme), smoothstep(0.90, 1.0, p) * node * mix(0.72, 0.24, theme));
-
-    float alpha = min(1.0, 0.64 + lock * 0.25 + reveal * 0.08 + dive * 0.18);
-    alpha = mix(alpha, 0.70 + edge * 0.18 + blueprintGrid * 0.10, theme);
-    gl_FragColor = vec4(color, alpha);
-  }
-`;
-
-const FOCUS_FRAGMENT_SHADER = `
-  precision mediump float;
-  varying vec2 vUv;
-  uniform vec2 uResolution;
-  uniform float uProgress;
-  uniform float uTime;
-  uniform float uThemeFactor;
-
-  float easeOut(float x) {
-    x = clamp(x, 0.0, 1.0);
-    return 1.0 - pow(1.0 - x, 3.0);
-  }
-
-  void main() {
-    float p = easeOut(uProgress);
-    float theme = clamp(uThemeFactor, 0.0, 1.0);
-    vec2 centered = vUv - 0.5;
-    float aspect = uResolution.x / max(1.0, uResolution.y);
-    float lens = smoothstep(0.96, 0.08, length(centered * vec2(aspect, 1.0)));
-    float scan = 0.5 + 0.5 * sin(vUv.y * 980.0 + uTime * 54.0);
-    float fine = 0.5 + 0.5 * sin((vUv.x + vUv.y) * 210.0 - uTime * 24.0);
-    vec3 cyan = mix(vec3(0.024, 0.714, 0.832), vec3(0.118, 0.161, 0.231), theme);
-    vec3 spark = mix(vec3(0.961, 0.620, 0.043), vec3(0.761, 0.255, 0.047), theme);
-    vec3 color = cyan * (scan * mix(0.10, 0.045, theme) + fine * mix(0.035, 0.028, theme)) * lens;
-    color += mix(cyan, spark, p) * (1.0 - p) * mix(0.08, 0.04, theme);
-    float alpha = (1.0 - p) * mix(0.34, 0.18, theme) + scan * (1.0 - p) * mix(0.055, 0.028, theme);
-    gl_FragColor = vec4(color, alpha);
-  }
-`;
-
-function compileShader(gl: WebGLRenderingContext, type: number, source: string) {
-  const shader = gl.createShader(type);
-  if (!shader) throw new Error('Unable to create shader');
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    const message = gl.getShaderInfoLog(shader) || 'Unknown shader error';
-    gl.deleteShader(shader);
-    throw new Error(message);
-  }
-  return shader;
-}
-
-function createProgram(gl: WebGLRenderingContext, fragmentSource: string) {
-  const vertex = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
-  const fragment = compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
-  const program = gl.createProgram();
-  if (!program) throw new Error('Unable to create program');
-  gl.attachShader(program, vertex);
-  gl.attachShader(program, fragment);
-  gl.linkProgram(program);
-  gl.deleteShader(vertex);
-  gl.deleteShader(fragment);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    const message = gl.getProgramInfoLog(program) || 'Unknown link error';
-    gl.deleteProgram(program);
-    throw new Error(message);
-  }
-  return program;
-}
 
 function routeFromHref(href: string) {
   const url = new URL(href, window.location.href);
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
-function readThemeFactor() {
-  return document.documentElement.dataset.theme === 'day' ? 1 : 0;
+function isDayMode() {
+  return document.documentElement.dataset.theme === 'day';
 }
 
 function resetRouteArtifacts() {
   document.body.classList.remove('optical-routing-active');
   document.body.classList.remove('focus-resolution-active');
   document.body.style.overflow = '';
-  document.querySelectorAll('.blueprint-route-canvas, .focus-resolution-canvas').forEach((node) => node.remove());
+  document.querySelectorAll('.blueprint-route-canvas, .focus-resolution-canvas, .route-dive-shell').forEach((node) => node.remove());
   document.querySelectorAll<HTMLElement>('[data-route-focus="true"]').forEach((node) => node.removeAttribute('data-route-focus'));
   document.querySelectorAll<HTMLElement>('.mobile-route-exit').forEach((node) => node.classList.remove('mobile-route-exit'));
 }
 
-function dispose(state: DiveState) {
-  state.doneFired = true;
-  cancelAnimationFrame(state.raf);
-  state.gl.deleteBuffer(state.buffer);
-  state.gl.deleteProgram(state.program);
-  state.canvas.remove();
-  state.target.removeAttribute('data-route-focus');
-  document.body.classList.remove('optical-routing-active');
-  document.body.style.overflow = state.originalBodyOverflow;
-  state.onDone();
-}
-
 function runFocusResolution() {
-  const duration = 360;
-  const themeFactor = readThemeFactor();
+  resetFocusArtifacts();
   document.body.classList.add('focus-resolution-active');
 
-  const finish = () => {
+  const overlay = document.createElement('div');
+  overlay.className = 'focus-resolution-canvas focus-resolution-scan';
+  overlay.dataset.theme = isDayMode() ? 'day' : 'dark';
+  document.body.appendChild(overlay);
+
+  window.setTimeout(() => {
     document.body.classList.remove('focus-resolution-active');
-  };
-
-  const canvas = document.createElement('canvas');
-  canvas.className = 'focus-resolution-canvas';
-  document.body.appendChild(canvas);
-
-  const gl = canvas.getContext('webgl', {
-    alpha: true,
-    antialias: false,
-    depth: false,
-    stencil: false,
-    preserveDrawingBuffer: false,
-    powerPreference: 'high-performance'
-  });
-
-  if (!gl) {
-    window.setTimeout(finish, duration);
-    window.setTimeout(() => canvas.remove(), duration + 40);
-    return;
-  }
-
-  const program = createProgram(gl, FOCUS_FRAGMENT_SHADER);
-  const buffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-  const aPosition = gl.getAttribLocation(program, 'aPosition');
-  const uResolution = gl.getUniformLocation(program, 'uResolution');
-  const uProgress = gl.getUniformLocation(program, 'uProgress');
-  const uTime = gl.getUniformLocation(program, 'uTime');
-  const uThemeFactor = gl.getUniformLocation(program, 'uThemeFactor');
-  const startedAt = performance.now();
-  let raf = 0;
-
-  const resize = () => {
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    canvas.width = Math.max(1, Math.floor(window.innerWidth * dpr));
-    canvas.height = Math.max(1, Math.floor(window.innerHeight * dpr));
-    gl.viewport(0, 0, canvas.width, canvas.height);
-  };
-  resize();
-
-  const render = (now: number) => {
-    const elapsed = now - startedAt;
-    const progress = Math.min(1, elapsed / duration);
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-
-    gl.useProgram(program);
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.enableVertexAttribArray(aPosition);
-    gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
-    gl.uniform2f(uResolution, window.innerWidth * dpr, window.innerHeight * dpr);
-    gl.uniform1f(uProgress, progress);
-    gl.uniform1f(uTime, elapsed / 1000);
-    gl.uniform1f(uThemeFactor, themeFactor);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-
-    if (progress >= 1) {
-      cancelAnimationFrame(raf);
-      gl.deleteBuffer(buffer);
-      gl.deleteProgram(program);
-      canvas.remove();
-      finish();
-      return;
-    }
-
-    raf = requestAnimationFrame(render);
-  };
-
-  window.addEventListener('resize', resize, { once: true });
-  raf = requestAnimationFrame(render);
+    overlay.remove();
+  }, 360);
 }
 
-function runBlueprintDive(target: HTMLElement, onCommit: () => void, onDone: () => void) {
-  const canvas = document.createElement('canvas');
-  canvas.className = 'blueprint-route-canvas';
-  document.body.appendChild(canvas);
+function resetFocusArtifacts() {
+  document.body.classList.remove('focus-resolution-active');
+  document.querySelectorAll('.focus-resolution-canvas').forEach((node) => node.remove());
+}
 
-  const gl = canvas.getContext('webgl', {
-    alpha: true,
-    antialias: false,
-    depth: false,
-    stencil: false,
-    preserveDrawingBuffer: false,
-    powerPreference: 'high-performance'
-  });
-
-  if (!gl) {
-    canvas.remove();
-    onCommit();
-    onDone();
-    return null;
-  }
-
-  const program = createProgram(gl, DIVE_FRAGMENT_SHADER);
-  const buffer = gl.createBuffer();
-  const themeFactor = readThemeFactor();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+function runBlueprintDive(target: HTMLElement, onCommit: () => void) {
+  resetRouteArtifacts();
 
   const rect = target.getBoundingClientRect();
-  const targetCenter = {
-    x: rect.left + rect.width * 0.5,
-    y: rect.top + rect.height * 0.5
-  };
-  const targetSize = {
-    x: Math.max(1, rect.width),
-    y: Math.max(1, rect.height)
-  };
-
-  const state: DiveState = {
-    canvas,
-    gl,
-    program,
-    buffer,
-    raf: 0,
-    commitFired: false,
-    doneFired: false,
-    startedAt: performance.now(),
-    target,
-    originalBodyOverflow: document.body.style.overflow,
-    onCommit,
-    onDone
-  };
+  const shell = document.createElement('div');
+  const frame = document.createElement('div');
+  shell.className = 'blueprint-route-canvas route-dive-shell';
+  shell.dataset.theme = isDayMode() ? 'day' : 'dark';
+  frame.className = 'route-dive-frame';
+  frame.style.left = `${rect.left}px`;
+  frame.style.top = `${rect.top}px`;
+  frame.style.width = `${Math.max(1, rect.width)}px`;
+  frame.style.height = `${Math.max(1, rect.height)}px`;
+  frame.style.setProperty('--route-dx', `${window.innerWidth * 0.5 - (rect.left + rect.width * 0.5)}px`);
+  frame.style.setProperty('--route-dy', `${window.innerHeight * 0.5 - (rect.top + rect.height * 0.5)}px`);
+  shell.appendChild(frame);
+  document.body.appendChild(shell);
 
   target.setAttribute('data-route-focus', 'true');
   document.body.classList.add('optical-routing-active');
   document.body.style.overflow = 'hidden';
 
-  const resize = () => {
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    canvas.width = Math.max(1, Math.floor(window.innerWidth * dpr));
-    canvas.height = Math.max(1, Math.floor(window.innerHeight * dpr));
-    gl.viewport(0, 0, canvas.width, canvas.height);
-  };
-  resize();
-
-  const aPosition = gl.getAttribLocation(program, 'aPosition');
-  const uResolution = gl.getUniformLocation(program, 'uResolution');
-  const uCardCenter = gl.getUniformLocation(program, 'uCardCenter');
-  const uCardSize = gl.getUniformLocation(program, 'uCardSize');
-  const uProgress = gl.getUniformLocation(program, 'uProgress');
-  const uTime = gl.getUniformLocation(program, 'uTime');
-  const uThemeFactor = gl.getUniformLocation(program, 'uThemeFactor');
-
-  const render = (now: number) => {
-    const elapsed = now - state.startedAt;
-    const progress = Math.min(1, elapsed / 1320);
-
-    if (!state.commitFired && progress > 0.84) {
-      state.commitFired = true;
-      state.onCommit();
-    }
-
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    gl.useProgram(program);
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.enableVertexAttribArray(aPosition);
-    gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
-    gl.uniform2f(uResolution, window.innerWidth * dpr, window.innerHeight * dpr);
-    gl.uniform2f(uCardCenter, targetCenter.x * dpr, targetCenter.y * dpr);
-    gl.uniform2f(uCardSize, targetSize.x * dpr, targetSize.y * dpr);
-    gl.uniform1f(uProgress, progress);
-    gl.uniform1f(uTime, elapsed / 1000);
-    gl.uniform1f(uThemeFactor, themeFactor);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-
-    if (progress >= 1 && !state.doneFired) {
-      dispose(state);
-      return;
-    }
-
-    state.raf = requestAnimationFrame(render);
-  };
-
-  window.addEventListener('resize', resize, { once: true });
-  state.raf = requestAnimationFrame(render);
-  return state;
+  window.requestAnimationFrame(() => frame.classList.add('is-dive-active'));
+  window.setTimeout(onCommit, 610);
+  window.setTimeout(() => {
+    shell.remove();
+    target.removeAttribute('data-route-focus');
+    document.body.classList.remove('optical-routing-active');
+    document.body.style.overflow = '';
+  }, 980);
 }
 
 function isRoutableAnchor(target: EventTarget | null): HTMLAnchorElement | null {
@@ -410,34 +86,9 @@ function isRoutableAnchor(target: EventTarget | null): HTMLAnchorElement | null 
 export function OscilloscopeRouteTransition() {
   const router = useRouter();
   const pathname = usePathname();
-  const activeRef = useRef<DiveState | null>(null);
-  const pendingHrefRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const active = activeRef.current;
-    const pendingPath = pendingHrefRef.current ? new URL(pendingHrefRef.current, window.location.href).pathname : null;
-
-    if (active && pendingPath === pathname) {
-      window.setTimeout(() => runFocusResolution(), 80);
-      window.setTimeout(() => {
-        const state = activeRef.current;
-        if (!state) return;
-        dispose(state);
-        activeRef.current = null;
-        pendingHrefRef.current = null;
-        resetRouteArtifacts();
-      }, 260);
-      return;
-    }
-
-    if (active) {
-      dispose(active);
-      activeRef.current = null;
-    }
-
-    pendingHrefRef.current = null;
     resetRouteArtifacts();
-
     if (pathname.startsWith('/posts/')) {
       window.setTimeout(() => runFocusResolution(), 30);
     }
@@ -465,11 +116,6 @@ export function OscilloscopeRouteTransition() {
     mutationObserver.observe(document.body, { childList: true, subtree: true });
 
     const cleanupOnRestore = () => {
-      if (activeRef.current) {
-        dispose(activeRef.current);
-        activeRef.current = null;
-      }
-      pendingHrefRef.current = null;
       resetRouteArtifacts();
       window.setTimeout(bindAutoCards, 0);
     };
@@ -481,47 +127,27 @@ export function OscilloscopeRouteTransition() {
     const onClick = (event: MouseEvent) => {
       const anchor = isRoutableAnchor(event.target);
       if (!anchor) return;
-
-      if (activeRef.current) {
-        const active = activeRef.current;
-        const stale = !active.canvas.isConnected || !active.target.isConnected || !document.body.classList.contains('optical-routing-active');
-        if (stale) {
-          activeRef.current = null;
-          pendingHrefRef.current = null;
-          resetRouteArtifacts();
-        } else {
-          return;
-        }
-      }
-
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
 
       event.preventDefault();
+      event.stopPropagation();
+      resetRouteArtifacts();
+
       const href = anchor.href;
       const route = routeFromHref(href);
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const isMobile = window.matchMedia('(max-width: 768px)').matches;
-      pendingHrefRef.current = href;
       router.prefetch(new URL(href, window.location.href).pathname);
 
       if (isMobile || reducedMotion) {
         anchor.classList.add('mobile-route-exit');
-        window.setTimeout(() => router.push(route), 220);
+        window.setTimeout(() => router.push(route), 180);
         return;
       }
 
       try {
-        activeRef.current = runBlueprintDive(
-          anchor,
-          () => router.push(route),
-          () => {
-            activeRef.current = null;
-            pendingHrefRef.current = null;
-            resetRouteArtifacts();
-          }
-        );
+        runBlueprintDive(anchor, () => router.push(route));
       } catch {
-        pendingHrefRef.current = null;
         resetRouteArtifacts();
         router.push(route);
       }
@@ -535,6 +161,7 @@ export function OscilloscopeRouteTransition() {
       window.removeEventListener('popstate', cleanupOnRestore);
       window.removeEventListener('visibilitychange', cleanupOnRestore);
       document.removeEventListener('click', onClick, true);
+      resetRouteArtifacts();
     };
   }, [router]);
 
