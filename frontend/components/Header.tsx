@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ThemeToggle } from './ThemeToggle';
 
 const nav = [
   ['文章', '/posts'],
@@ -17,7 +18,7 @@ export function Header() {
         </Link>
         <div className="nav-links">
           {nav.map(([label, href]) => <Link key={href} href={href}>{label}</Link>)}
-          <a href="https://github.com/alex-nexus" target="_blank" rel="noreferrer">GitHub</a>
+          <ThemeToggle />
         </div>
       </nav>
     </header>
